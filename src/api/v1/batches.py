@@ -9,13 +9,23 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.schemas.batch import BatchCreate, BatchResponse, ParentChildMapRequest
+from src.schemas.common import ErrorResponse
 from src.services.batch_service import BatchService
 from src.core.security import verify_api_key
 
 router = APIRouter()
 
 
-@router.post("", response_model=BatchResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=BatchResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Failed to create batch"},
+    },
+)
 async def create_batch(
     request: BatchCreate,
     api_key: str = Depends(verify_api_key),
@@ -41,7 +51,14 @@ async def create_batch(
         )
 
 
-@router.get("/{batch_id}", response_model=BatchResponse)
+@router.get(
+    "/{batch_id}",
+    response_model=BatchResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Batch not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
 async def get_batch(
     batch_id: UUID,
     api_key: str = Depends(verify_api_key),

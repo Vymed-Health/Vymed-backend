@@ -41,9 +41,12 @@ class StellarService:
             if settings.STELLAR_NETWORK == "TESTNET"
             else Network.PUBLIC_NETWORK_PASSPHRASE
         )
-        self.manufacturer_keypair = Keypair.from_secret(
-            settings.MANUFACTURER_SECRET_KEY
-        )
+        if settings.MANUFACTURER_SECRET_KEY:
+            self.manufacturer_keypair = Keypair.from_secret(
+                settings.MANUFACTURER_SECRET_KEY
+            )
+        else:
+            self.manufacturer_keypair = Keypair.random()
 
     async def verify_unit(self, unit_id: str) -> Dict[str, Any]:
         """
@@ -171,25 +174,35 @@ class StellarService:
     async def create_fee_bump_transaction(
         self,
         inner_transaction_xdr: str,
+        base_fee: int = 200,
     ) -> str:
         """
-        Wrap a transaction in a Fee Bump sponsored by the manufacturer.
+        Wrap a transaction in a Fee Bump sponsored by the manufacturer (VH-B01).
 
         This ensures patients never pay transaction fees.
 
         Args:
             inner_transaction_xdr: The XDR of the inner transaction.
+            base_fee: Base fee in stroops (default 200).
 
         Returns:
             The XDR of the Fee Bump transaction.
         """
-        # TODO: Implement Fee Bump transaction wrapping
-        # fee_bump = FeeBumpTransaction(
-        #     fee_source=self.manufacturer_keypair,
-        #     inner_transaction_xdr=inner_transaction_xdr,
-        #     base_fee=100,  # Base fee in stroops
-        # )
-        # fee_bump.sign(self.manufacturer_keypair)
-        # return fee_bump.to_xdr()
+        from stellar_sdk import TransactionEnvelope
 
-        return "pending_implementation"
+        if isinstance(inner_transaction_xdr, str):
+            inner_envelope = TransactionEnvelope.from_xdr(
+                inner_transaction_xdr, self.network_passphrase
+            )
+        else:
+            inner_envelope = inner_transaction_xdr
+
+        fee_bump = TransactionBuilder.build_fee_bump_transaction(
+            fee_source=self.manufacturer_keypair,
+            base_fee=base_fee,
+            inner_transaction_envelope=inner_envelope,
+            network_passphrase=self.network_passphrase,
+        )
+        fee_bump.sign(self.manufacturer_keypair)
+        return fee_bump.to_xdr()
+

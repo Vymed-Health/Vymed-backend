@@ -9,13 +9,23 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.schemas.recall import RecallCreate, RecallResponse
+from src.schemas.common import ErrorResponse
 from src.services.stellar_service import StellarService
 from src.core.security import verify_api_key
 
 router = APIRouter()
 
 
-@router.post("", response_model=RecallResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=RecallResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Failed to initiate recall"},
+    },
+)
 async def initiate_recall(
     request: RecallCreate,
     api_key: str = Depends(verify_api_key),
@@ -46,7 +56,14 @@ async def initiate_recall(
         )
 
 
-@router.get("/{recall_id}", response_model=RecallResponse)
+@router.get(
+    "/{recall_id}",
+    response_model=RecallResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Recall not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
 async def get_recall_status(
     recall_id: UUID,
     api_key: str = Depends(verify_api_key),

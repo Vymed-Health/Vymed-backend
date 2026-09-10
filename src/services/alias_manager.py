@@ -63,6 +63,46 @@ class AliasManager:
 
             return alias
 
+    async def register_verified_alias(
+        self,
+        stellar_public_key: str,
+        challenge: str,
+        signature: str,
+        organization_name: Optional[str] = None,
+    ) -> dict:
+        """
+        Register a verified distributor alias with cryptographic signature verification (VH-B04).
+
+        Verifies that the caller owns the Stellar private key for `stellar_public_key`
+        by checking the Ed25519 signature over the provided challenge message.
+        """
+        from stellar_sdk import Keypair
+        import base64
+
+        try:
+            keypair = Keypair.from_public_key(stellar_public_key)
+            try:
+                sig_bytes = bytes.fromhex(signature)
+            except ValueError:
+                sig_bytes = base64.b64decode(signature)
+
+            keypair.verify(challenge.encode("utf-8"), sig_bytes)
+        except Exception as e:
+            raise ValueError(f"Invalid cryptographic signature for public key: {str(e)}")
+
+        alias = await self.get_or_create_alias(
+            stellar_public_key=stellar_public_key,
+            organization_name=organization_name,
+        )
+
+        return {
+            "stellar_public_key": stellar_public_key,
+            "alias": alias,
+            "verified": True,
+            "organization_name": organization_name,
+        }
+
+
     async def resolve_alias(
         self,
         alias: str,
